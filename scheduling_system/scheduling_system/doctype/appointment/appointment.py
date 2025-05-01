@@ -2,27 +2,32 @@
 # Copyright (c) 2025, Ryan Ledo and contributors
 # For license information, please see license.txt
 
-# import frappe
+
 from frappe.model.document import Document
 import frappe
-from frappe.utils import format_datetime
+from frappe.utils import format_datetime, add_to_date
 from frappe import _
+from datetime import datetime
 
 
 class Appointment(Document):
     def validate(self):
-        # frappe.msgprint("🚨 Entrou no validate()")
-
-        # mensagens de log para fins de debugar
-        frappe.msgprint(f"Start Date: {self.start_date}")  # type: ignore
-        frappe.msgprint(f"End Date: {self.end_date}")  # type: ignore
-        frappe.msgprint(f"Seller: {self.seller}")  # type: ignore
+        if not self.end_date:
+            duration_in_minutes = self.duration_to_minutes(
+                self.duration)  # type: ignore
+            self.end_date = add_to_date(
+                self.start_date, minutes=duration_in_minutes)  # type: ignore
 
         self.validate_seller_conflict()
 
+    def duration_to_minutes(self, duration: str) -> int:
+        # Metodo para converter a duracao de string para inteiro
+        h, m, s = [int(x) for x in duration.split(':')]
+
+        return h * 60 + m + int(s / 60)
+
     def validate_seller_conflict(self):
         # metodo para realizar a validacao
-
         overlapping_appointments = frappe.db.get_all(
             "Appointment",
             fields=["name", "start_date", "end_date"],
@@ -33,8 +38,6 @@ class Appointment(Document):
                 ["end_date", ">", self.start_date],  # type: ignore
             ]
         )
-
-        # frappe.msgprint("Entrou na validacao!!!")
 
         for appt in overlapping_appointments:
             frappe.throw(_(
